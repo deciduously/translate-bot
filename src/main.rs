@@ -38,18 +38,18 @@ struct TranslateReq {
 
 #[derive(Debug, Deserialize)]
 struct TranslateRes {
-    data: Data
+    data: Data,
 }
 
 #[derive(Debug, Deserialize)]
 struct Data {
-    translations: Vec<Translations>
+    translations: Vec<Translations>,
 }
 
 #[derive(Debug, Deserialize)]
 struct Translations {
-    #[serde(rename="translatedText")]
-    translated_text: String
+    #[serde(rename = "translatedText")]
+    translated_text: String,
 }
 
 fn create_translate_req(s: &str, l: Lang) -> Result<String, Error> {
@@ -78,7 +78,7 @@ fn translate(s: &str) -> Result<String, Box<::std::error::Error>> {
         .build(&handle);
 
     //TODO random language??
-    let json = create_translate_req(s, Lang::Ru)?;
+    let json = create_translate_req(s, Lang::Es)?;
 
     let uri = format!("{}?key={}", TRANSLATE_URI, env::var("KEY").unwrap())
         .parse()?;
@@ -91,19 +91,17 @@ fn translate(s: &str) -> Result<String, Box<::std::error::Error>> {
         println!("POST: {}", res.status());
         res.body().concat2().and_then(move |body| {
             let v: TranslateRes = serde_json::from_slice(&body).unwrap();
-            println!("Translated string: {}", v.data.translations[0].translated_text);
-            Ok(())
+            Ok((v.data.translations[0].translated_text.clone()))
         })
     });
 
-    core.run(post)?;
-    //println!("POST RESP: {}", str::from_utf8(&posted)?);
-    Ok(String::from("Hey!"))
+    let ret = core.run(post).unwrap();
+    Ok(ret)
 }
 
 fn main() {
     dotenv().ok();
     //let body = grab_post();
     //println!("{}", body);
-    println!("{:?}", translate("I am a book"));
+    println!("{}", translate("I am a book").unwrap());
 }
