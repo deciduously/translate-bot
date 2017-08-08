@@ -21,6 +21,7 @@ use tokio_core::reactor::Core;
 
 const TRANSLATE_URI: &str = "https://translation.googleapis.com/language/translate/v2";
 
+#[derive(Clone, Copy)]
 enum Lang {
     En,
     Es,
@@ -52,11 +53,11 @@ struct Translations {
     translated_text: String,
 }
 
-fn create_translate_req(s: &str, l: Lang) -> Result<String, Error> {
+fn create_translate_req(s: &str, l: &Lang) -> Result<String, Error> {
     let ret = TranslateReq {
         q: s.to_owned(),
         source: "en".to_owned(),
-        target: match l {
+        target: match *l {
             Lang::En => "en".to_owned(),
             Lang::Es => "es".to_owned(),
             Lang::Ru => "ru".to_owned(),
@@ -68,9 +69,16 @@ fn create_translate_req(s: &str, l: Lang) -> Result<String, Error> {
     serde_json::to_string(&ret)
 }
 
+fn random_lang() -> Lang {
+    //all but En
+    let langs = vec![Lang::Es, Lang::Fr, Lang::Ru];
+
+    *rand::thread_rng().choose(&langs).unwrap()
+}
+
 //translate takes a string and returns a translated string
 //TODO Box<Error> is not ideal - learn how to actually handle errors
-fn translate(s: &str) -> Result<String, Box<::std::error::Error>> {
+fn translate(s: &str, l: &Lang) -> Result<String, Box<::std::error::Error>> {
     let mut core = Core::new()?;
     let handle = core.handle();
     let client = Client::configure()
@@ -78,7 +86,7 @@ fn translate(s: &str) -> Result<String, Box<::std::error::Error>> {
         .build(&handle);
 
     //TODO random language??
-    let json = create_translate_req(s, Lang::Es)?;
+    let json = create_translate_req(s, l)?;
 
     let uri = format!("{}?key={}", TRANSLATE_URI, env::var("KEY").unwrap())
         .parse()?;
@@ -95,13 +103,11 @@ fn translate(s: &str) -> Result<String, Box<::std::error::Error>> {
         })
     });
 
-    let ret = core.run(post).unwrap();
-    Ok(ret)
+    Ok(core.run(post).unwrap())
 }
 
 fn main() {
     dotenv().ok();
-    //let body = grab_post();
-    //println!("{}", body);
-    println!("{}", translate("I am a book").unwrap());
+
+    println!("{}", translate("I am a book", &random_lang()).unwrap());
 }
