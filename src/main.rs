@@ -2,7 +2,11 @@ extern crate dotenv;
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate rand;
+extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 extern crate tokio_core;
 
 use dotenv::dotenv;
@@ -11,54 +15,73 @@ use futures::{Future, Stream};
 use hyper::{Client, Method, Request};
 use hyper::header::{ContentLength, ContentType};
 use hyper_tls::HttpsConnector;
-use serde_json::Value;
+use rand::Rng;
+use serde_json::{Error, Value};
 use tokio_core::reactor::Core;
-
-//use rawr::prelude::*;
-//use rawr::traits::{Commentable, Content};
 
 const TRANSLATE_URI: &str = "https://translation.googleapis.com/language/translate/v2";
 
-//TODO NO CRATE FOR YOU.  Write it your damn self.
-/**
-//grab_post grabs the post to translate
-fn grab_post() -> String {
-    let client = RedditClient::new(
-        "linux:rawr:0.1.1 (by /u/IKnowYouDidntAskBut)",
-        AnonymousAuthenticator::new(),
-    );
-    let all = client.subreddit("all");
-    let mut rising_all = all.rising(ListingOptions::default()).expect(
-        "Could not fetch post listing!",
-    );
-
-    String::from(
-        rising_all
-            .next()
-            .expect("Could not grab post")
-            .replies()
-            .expect("Could not get replies")
-            .next()
-            .expect("Could not grab top")
-            .body()
-            .expect("Could not grab body"),
-    )
+enum Lang {
+    En,
+    Es,
+    Ru,
+    Fr,
 }
-*/
+
+#[derive(Serialize)]
+struct TranslateReq {
+    q: String,
+    source: String,
+    target: String,
+    format: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TranslateRes {
+    data: Data
+}
+
+#[derive(Debug, Deserialize)]
+struct Data {
+    translations: Vec<Translations>
+}
+
+#[derive(Debug, Deserialize)]
+struct Translations {
+    #[serde(rename="translatedText")]
+    translated_text: String
+}
+
+fn create_translate_req(s: &str, l: Lang) -> Result<String, Error> {
+    let ret = TranslateReq {
+        q: s.to_owned(),
+        source: "en".to_owned(),
+        target: match l {
+            Lang::En => "en".to_owned(),
+            Lang::Es => "es".to_owned(),
+            Lang::Ru => "ru".to_owned(),
+            Lang::Fr => "fr".to_owned(),
+        },
+        format: "text".to_owned(),
+    };
+
+    serde_json::to_string(&ret)
+}
 
 //translate takes a string and returns a translated string
 //TODO Box<Error> is not ideal - learn how to actually handle errors
-fn translate() -> Result<String, Box<::std::error::Error>> {
+fn translate(s: &str) -> Result<String, Box<::std::error::Error>> {
     let mut core = Core::new()?;
     let handle = core.handle();
     let client = Client::configure()
         .connector(HttpsConnector::new(4, &handle)?)
         .build(&handle);
 
-    //TODO get Serde to do this
-    let json = r#"{"q":"translate this string","source":"en","target":"es","format":"text"}"#;
+    //TODO random language??
+    let json = create_translate_req(s, Lang::Ru)?;
 
-    let uri = format!("{}?key={}", TRANSLATE_URI, env::var("KEY").unwrap()).parse()?;
+    let uri = format!("{}?key={}", TRANSLATE_URI, env::var("KEY").unwrap())
+        .parse()?;
     let mut req = Request::new(Method::Post, uri);
     req.headers_mut().set(ContentType::json());
     req.headers_mut().set(ContentLength(json.len() as u64));
@@ -67,9 +90,8 @@ fn translate() -> Result<String, Box<::std::error::Error>> {
     let post = client.request(req).and_then(|res| {
         println!("POST: {}", res.status());
         res.body().concat2().and_then(move |body| {
-            //TODO START HERE use stronger Serde
-            let v: Value = serde_json::from_slice(&body).unwrap();
-            println!("Translated string: {}", v["data"]);
+            let v: TranslateRes = serde_json::from_slice(&body).unwrap();
+            println!("Translated string: {}", v.data.translations[0].translated_text);
             Ok(())
         })
     });
@@ -83,5 +105,5 @@ fn main() {
     dotenv().ok();
     //let body = grab_post();
     //println!("{}", body);
-    println!("{:?}", translate());
+    println!("{:?}", translate("I am a book"));
 }
