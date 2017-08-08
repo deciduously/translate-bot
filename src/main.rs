@@ -9,25 +9,20 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate tokio_core;
 
+mod lang;
+
 use dotenv::dotenv;
+use lang::Lang;
 use std::{env, str};
 use futures::{Future, Stream};
 use hyper::{Client, Method, Request};
 use hyper::header::{ContentLength, ContentType};
 use hyper_tls::HttpsConnector;
-use rand::Rng;
-use serde_json::{Error, Value};
 use tokio_core::reactor::Core;
 
 const TRANSLATE_URI: &str = "https://translation.googleapis.com/language/translate/v2";
 
-#[derive(Clone, Copy)]
-enum Lang {
-    En,
-    Es,
-    Ru,
-    Fr,
-}
+//TODO move all Lang stuff into its own module
 
 #[derive(Serialize)]
 struct TranslateReq {
@@ -53,27 +48,15 @@ struct Translations {
     translated_text: String,
 }
 
-fn create_translate_req(s: &str, l: &Lang) -> Result<String, Error> {
+fn create_translate_req(s: &str, l: &Lang) -> Result<String, serde_json::Error> {
     let ret = TranslateReq {
         q: s.to_owned(),
         source: "en".to_owned(),
-        target: match *l {
-            Lang::En => "en".to_owned(),
-            Lang::Es => "es".to_owned(),
-            Lang::Ru => "ru".to_owned(),
-            Lang::Fr => "fr".to_owned(),
-        },
+        target: l.short(),
         format: "text".to_owned(),
     };
 
     serde_json::to_string(&ret)
-}
-
-fn random_lang() -> Lang {
-    //all but En
-    let langs = vec![Lang::Es, Lang::Fr, Lang::Ru];
-
-    *rand::thread_rng().choose(&langs).unwrap()
 }
 
 //translate takes a string and returns a translated string
@@ -85,7 +68,6 @@ fn translate(s: &str, l: &Lang) -> Result<String, Box<::std::error::Error>> {
         .connector(HttpsConnector::new(4, &handle)?)
         .build(&handle);
 
-    //TODO random language??
     let json = create_translate_req(s, l)?;
 
     let uri = format!("{}?key={}", TRANSLATE_URI, env::var("KEY").unwrap())
@@ -99,7 +81,7 @@ fn translate(s: &str, l: &Lang) -> Result<String, Box<::std::error::Error>> {
         println!("POST: {}", res.status());
         res.body().concat2().and_then(move |body| {
             let v: TranslateRes = serde_json::from_slice(&body).unwrap();
-            Ok((v.data.translations[0].translated_text.clone()))
+            Ok(v.data.translations[0].translated_text.clone())
         })
     });
 
@@ -109,5 +91,12 @@ fn translate(s: &str, l: &Lang) -> Result<String, Box<::std::error::Error>> {
 fn main() {
     dotenv().ok();
 
-    println!("{}", translate("I am a book", &random_lang()).unwrap());
+    let en_text = "This language is cool";
+    let lang = Lang::random();
+    println!(
+        "'{}' is '{}' in {}",
+        en_text,
+        translate(en_text, &lang).unwrap(),
+        lang
+    );
 }
