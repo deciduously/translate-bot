@@ -34,17 +34,6 @@ struct Translations {
     translated_text: String,
 }
 
-fn create_translate_req(s: &str, l: &Lang) -> Result<String, serde_json::Error> {
-    let ret = TranslateReq {
-        q: s.to_owned(),
-        source: "en".to_owned(),
-        target: l.short(),
-        format: "text".to_owned(),
-    };
-
-    serde_json::to_string(&ret)
-}
-
 //translate takes a string and returns a translated string
 //TODO Box<Error> is not ideal - learn how to actually handle errors
 pub fn translate(s: &str, l: &Lang) -> Result<String, Box<::std::error::Error>> {
@@ -54,9 +43,14 @@ pub fn translate(s: &str, l: &Lang) -> Result<String, Box<::std::error::Error>> 
         .connector(HttpsConnector::new(4, &handle)?)
         .build(&handle);
 
-    let json = create_translate_req(s, l)?;
+    let json = serde_json::to_string(&TranslateReq {
+        q: s.to_owned(),
+        source: "en".to_owned(),
+        target: l.short(),
+        format: "text".to_owned(),
+    })?;
 
-    let uri = format!("{}?key={}", TRANSLATE_URI, env::var("KEY").unwrap())
+    let uri = format!("{}?key={}", TRANSLATE_URI, env::var("TRANSLATE_KEY").unwrap())
         .parse()?;
     let mut req = Request::new(Method::Post, uri);
     req.headers_mut().set(ContentType::json());

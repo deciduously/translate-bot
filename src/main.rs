@@ -10,6 +10,7 @@ extern crate serde_derive;
 extern crate tokio_core;
 
 mod lang;
+mod reddit;
 mod translate;
 
 use dotenv::dotenv;
@@ -27,4 +28,6 @@ fn main() {
         translate(en_text, &lang).unwrap(),
         lang
     );
+    let token = reddit::request_token().unwrap();
+    println!("token: {}", token);
 }
