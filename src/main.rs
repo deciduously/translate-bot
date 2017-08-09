@@ -22,12 +22,12 @@ fn main() {
 
     let en_text = "This language is cool";
     let lang = Lang::random();
-    println!(
-        "'{}' is '{}' in {}",
-        en_text,
-        translate(en_text, &lang).unwrap(),
-        lang
-    );
-    let token = reddit::request_token().unwrap();
-    println!("token: {}", token);
+    //println!(
+    //    "'{}' is '{}' in {}",
+    //    en_text,
+    //    translate(en_text, &lang).unwrap(),
+    //    lang
+    //);
+    let me = reddit::request_me().unwrap();
+    println!("me: {}", me);
 }
